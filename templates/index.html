@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification Service</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="container mt-5">
+    <h1 class="mb-4">Notification Service</h1>
+    <div class="row">
+        <div class="col-md-6">
+            <h2>Send Notification</h2>
+            <form id="sendForm">
+                <div class="mb-3">
+                    <label for="user_id" class="form-label">User ID</label>
+                    <input type="text" class="form-control" id="user_id" required>
+                </div>
+                <div class="mb-3">
+                    <label for="type" class="form-label">Type</label>
+                    <select class="form-select" id="type" required>
+                        <option value="email">Email</option>
+                        <option value="sms">SMS</option>
+                        <option value="in_app">In-App</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="message" class="form-label">Message</label>
+                    <textarea class="form-control" id="message" rows="3" required></textarea>
+                </div>
+                <div class="mb-3" id="targetField">
+                    <!-- Target field will be dynamically inserted here -->
+                </div>
+                <button type="submit" class="btn btn-primary">Send</button>
+            </form>
+            <div id="sendResult" class="mt-3"></div>
+        </div>
+        <div class="col-md-6">
+            <h2>Get Notifications</h2>
+            <form id="getForm">
+                <div class="mb-3">
+                    <label for="get_user_id" class="form-label">User ID</label>
+                    <input type="text" class="form-control" id="get_user_id" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Fetch All Notifications</button>
+            </form>
+            <div id="notificationsList" class="mt-3"></div>
+
+            <h2>Get Specific Notification</h2>
+            <form id="getSpecificForm">
+                <div class="mb-3">
+                    <label for="specific_user_id" class="form-label">User ID</label>
+                    <input type="text" class="form-control" id="specific_user_id" required>
+                </div>
+                <div class="mb-3">
+                    <label for="notification_id" class="form-label">Notification ID</label>
+                    <input type="text" class="form-control" id="notification_id" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Fetch Specific Notification</button>
+            </form>
+            <div id="specificNotification" class="mt-3"></div>
+
+        </div>
+    </div>
+    <script>
+        // Dynamic target field based on notification type
+        document.getElementById('type').addEventListener('change', (e) => {
+            const targetField = document.getElementById('targetField');
+            const type = e.target.value;
+            let html = '';
+            if (type === 'email') {
+                html = `
+                    <label for="target" class="form-label">Email Address</label>
+                    <input type="email" class="form-control" id="target" required>
+                    `;
+            } else if (type === 'sms') {
+                html = `
+                    <label for="target" class="form-label">Phone Number</label>
+                    <input type="tel" class="form-control" id="target" required>
+                    `;
+            } else if (type === 'in_app') {
+                html = `
+                    <label for="target" class="form-label">Username</label>
+                    <input type="text" class="form-control" id="target" required>
+                    `;
+            }
+            targetField.innerHTML = html;
+        });
+        // Trigger initial change to set up target field
+        document.getElementById('type').dispatchEvent(new Event('change'));
+        document.getElementById('sendForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const response = await fetch('/notifications', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: document.getElementById('user_id').value,
+                    type: document.getElementById('type').value,
+                    message: document.getElementById('message').value,
+                    target: document.getElementById('target').value
+                })
+            });
+            const result = await response.json();
+            const resultDiv = document.getElementById('sendResult');
+            if (response.status === 201) {
+                resultDiv.innerHTML = `<div class="alert alert-success">Notification sent successfully at ${result.timestamp}</div>`;
+            } else {
+                resultDiv.innerHTML = `<div class="alert alert-danger">Error: ${result.error}</div>`;
+            }
+        });
+        document.getElementById('getForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userId = document.getElementById('get_user_id').value;
+            const response = await fetch(`/users/${userId}/notifications`);
+            const notifications = await response.json();
+            const listDiv = document.getElementById('notificationsList');
+            if (notifications.length === 0) {
+                listDiv.innerHTML = '<div class="alert alert-info">No notifications found for this user</div>';
+            } else {
+                let html = '<div class="list-group">';
+                notifications.forEach(notif => {
+                    html += `<a href="#" class="list-group-item list-group-item-action">
+                    <div class="d-flex w-100 justify-content-between">
+                    <div>
+                    <h5 class="mb-1">${notif.type}</h5>
+                    <small class="text-muted">User: ${notif.user_id}</small>
+                    <small class="text-muted ms-2">ID: ${notif.id}</small>
+                    </div>
+                    <small>${notif.timestamp}</small>
+                    </div>
+                    <p class="mb-1">${notif.message}</p>
+                    <small class="text-muted">Target: ${notif.target}</small>
+                    </a>`;
+                });
+                html += '</div>';
+                listDiv.innerHTML = html;
+            }
+        });
+
+        document.getElementById('getSpecificForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userId = document.getElementById('specific_user_id').value;
+            const notificationId = document.getElementById('notification_id').value;
+            const response = await fetch(`/users/${userId}/${notificationId}/notifications`);
+            const data = await response.json();
+            const specificNotificationDiv = document.getElementById('specificNotification');
+
+            if (response.status === 200) {
+                specificNotificationDiv.innerHTML = `
+                <div class="card">
+                <div class="card-body">
+                <h5 class="card-title">${data.type}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">User: ${data.user_id} - ID: ${data.id}</h6>
+                <p class="card-text">${data.message}</p>
+                <p class="card-text"><small class="text-muted">Target: ${data.target}</small></p>
+                <p class="card-text"><small class="text-muted">Timestamp: ${data.timestamp}</small></p>
+                </div>
+                </div>
+                `;
+            } else {
+                specificNotificationDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
+            }
+        });
+    </script>
+</body>
+
+</html>
